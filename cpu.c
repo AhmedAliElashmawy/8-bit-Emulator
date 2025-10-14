@@ -1,8 +1,29 @@
 #include "cpu.h"
 #include "opcode.h"
+#include "sdl_display.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+
+const uint8_t chip8_fontset[FONTSET_SIZE] = {
+    0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+    0x20, 0x60, 0x20, 0x20, 0x70, // 1
+    0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+    0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+    0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+    0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+    0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+    0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+    0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+    0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
+    0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+    0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+    0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+    0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+    0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+    0xF0, 0x80, 0xF0, 0x80, 0x80  // F
+};
 
 Chip8 chip8;
 
@@ -15,6 +36,8 @@ void init_cpu(Chip8* chip8) {
     chip8->I = 0;
     memset(chip8->stack, 0, sizeof(chip8->stack));
     chip8->SP = 0;
+    memcpy(&chip8->memory[FONTSET_START_ADDRESS], chip8_fontset, FONTSET_SIZE);
+    clear_screen(chip8);
 }
 
 
@@ -46,20 +69,62 @@ void rom_loader(Chip8* chip8, const char* FilePath) {
 void fetch(Chip8* chip8) {
     // Fetch the next opcode
     chip8->opcode = (chip8->memory[chip8->PC] << 8) | chip8->memory[chip8->PC + 1];
-    fprintf(stdout, "Fetched opcode: 0x%X\n", chip8->opcode);
+    // fprintf(stdout, "Fetched opcode: 0x%X\n", chip8->opcode);
 }
 
-int main() {
+void clear_screen(Chip8* chip8){
+    memset(chip8->gfx, 0, DISPLAY_WIDTH * DISPLAY_HEIGHT);
+    chip8->draw_flag = true;
+}
+
+void draw_sprite(Chip8* chip8, uint8_t x, uint8_t y, uint8_t height) {
+    chip8->V[0xF] = 0;
+    for (uint8_t row = 0; row < height; row++) {
+        uint8_t sprite_byte = chip8->memory[chip8->I + row];
+        for (uint8_t col = 0; col < 8; col++) {
+            if ((sprite_byte & (0x80 >> col)) == 0) { continue; }
+            uint8_t px = (x + col) % DISPLAY_WIDTH;
+            uint8_t py = (y + row) % DISPLAY_HEIGHT;
+            if (chip8->gfx[px][py] == 1) { chip8->V[0xF] = 1; }
+            chip8->gfx[px][py] ^= 1;
+        }
+    }
+    chip8->draw_flag = true;
+}
+
+int main(int argc, char* argv[]) {
+    const char* rom_path = (argc > 1) ? argv[1] : "IBM Logo.ch8";
+
     init_cpu(&chip8);
-    rom_loader(&chip8, "/home/ali/Desktop/GitProjects/8-bit-Emulator/BMP Viewer - Hello (C8 example) [Hap, 2005].ch8");
-    for(;;){
-    fetch(&chip8);
-    sleep(1); // Sleep for 1 second to slow down the fetch loop
-    if (chip8.PC >= MEMORY_SIZE) {
-        fprintf(stderr, "Program counter out of bounds\n");
-        break;
+    if (!sdl_display_init(PIXEL_SCALE)) {
+        return EXIT_FAILURE;
     }
-    decode(&chip8);
+    if (argc <= 1) {
+        fprintf(stdout, "No ROM supplied. Defaulting to '%s' in current directory.\n", rom_path);
     }
+
+    rom_loader(&chip8, rom_path);
+
+    bool running = true;
+    while (running && chip8.PC < MEMORY_SIZE - 1) {
+        if (chip8.PC > MEMORY_SIZE - 2) {
+            fprintf(stderr, "Program counter out of bounds: 0x%X\n", chip8.PC);
+            break;
+        }
+
+        if (!sdl_display_process_events()) {
+            break;
+        }
+
+        fetch(&chip8);
+        decode(&chip8);
+        if (chip8.draw_flag) {
+            sdl_display_render(&chip8);
+        }
+
+        sdl_display_delay(2);
+    }
+
+    sdl_display_shutdown();
     return 0;
 }
