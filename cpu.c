@@ -27,15 +27,18 @@ const uint8_t chip8_fontset[FONTSET_SIZE] = {
 
 Chip8 chip8;
 
+// Initialize the CPU state
 void init_cpu(Chip8* chip8) {
-    // Initialize the CPU state
-    chip8->opcode = 0;
     memset(chip8->V, 0, sizeof(chip8->V));
     memset(chip8->memory, 0, sizeof(chip8->memory));
+    memset(chip8->stack, 0, sizeof(chip8->stack));
+    memset(chip8->key, 0, sizeof(chip8->key));
+    chip8->opcode = 0;
     chip8->PC = 0x200;  // Program counter starts at 0x200
     chip8->I = 0;
-    memset(chip8->stack, 0, sizeof(chip8->stack));
     chip8->SP = 0;
+    chip8->delay_timer = 0;
+    chip8->sound_timer = 0;
     memcpy(&chip8->memory[FONTSET_START_ADDRESS], chip8_fontset, FONTSET_SIZE);
     clear_screen(chip8);
 }
@@ -66,10 +69,9 @@ void rom_loader(Chip8* chip8, const char* FilePath) {
     fclose(rom);
 }
 
+// Fetch the next opcode
 void fetch(Chip8* chip8) {
-    // Fetch the next opcode
     chip8->opcode = (chip8->memory[chip8->PC] << 8) | chip8->memory[chip8->PC + 1];
-    // fprintf(stdout, "Fetched opcode: 0x%X\n", chip8->opcode);
 }
 
 void clear_screen(Chip8* chip8){
@@ -93,7 +95,7 @@ void draw_sprite(Chip8* chip8, uint8_t x, uint8_t y, uint8_t height) {
 }
 
 int main(int argc, char* argv[]) {
-    const char* rom_path = (argc > 1) ? argv[1] : "IBM Logo.ch8";
+    const char* rom_path = (argc > 1) ? argv[1] : "Soccer.ch8";
 
     init_cpu(&chip8);
     if (!sdl_display_init(PIXEL_SCALE)) {
@@ -106,23 +108,30 @@ int main(int argc, char* argv[]) {
     rom_loader(&chip8, rom_path);
 
     bool running = true;
+    uint32_t last_render = SDL_GetTicks();
+
     while (running && chip8.PC < MEMORY_SIZE - 1) {
         if (chip8.PC > MEMORY_SIZE - 2) {
             fprintf(stderr, "Program counter out of bounds: 0x%X\n", chip8.PC);
             break;
         }
 
-        if (!sdl_display_process_events()) {
+        if (!sdl_display_process_events(&chip8)) {
             break;
         }
+        sdl_display_update_timers(&chip8);
 
         fetch(&chip8);
         decode(&chip8);
-        if (chip8.draw_flag) {
+
+        uint32_t now = SDL_GetTicks();
+        if (now - last_render >= 16) { // ~60Hz
             sdl_display_render(&chip8);
+            chip8.draw_flag = false;
+            last_render = now;
         }
 
-        sdl_display_delay(2);
+        sdl_display_delay(1);
     }
 
     sdl_display_shutdown();

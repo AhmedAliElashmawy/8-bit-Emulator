@@ -23,6 +23,9 @@ typedef struct {
     uint8_t SP;
     uint8_t gfx[DISPLAY_WIDTH][DISPLAY_HEIGHT];
     bool draw_flag;
+    uint8_t delay_timer; /* decremented at 60Hz */
+    uint8_t sound_timer; /* decremented at 60Hz; play sound while > 0 */
+    uint8_t key[16];     /* keypad state: 1 = pressed, 0 = released */
 } Chip8;
 
 void init_cpu(Chip8* chip8);
