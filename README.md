@@ -1,6 +1,7 @@
 <p align="center">
   <img src="docs/hello.png" alt="Project Demo" width="600">
 </p>
+
 # CHIP-8 Emulator
 
 > *Resurrect 1970s programs on your modern machine — pixel by pixel.*
