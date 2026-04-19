@@ -1,5 +1,6 @@
-![Hello ROM output](docs/hello.png)
-
+<p align="center">
+  <img src="docs/hello.png" alt="Project Demo" width="600">
+</p>
 # CHIP-8 Emulator
 
 > *Resurrect 1970s programs on your modern machine — pixel by pixel.*
@@ -96,7 +97,9 @@ Each ROM uses keys differently — check the original game's documentation to kn
 
 ## Tetris in Action
 
-![Tetris gameplay](docs/tetris.gif)
+<p align="center">
+  <img src="docs/tetris.gif" alt="Project Demo" width="600">
+</p>
 
 ---
 
